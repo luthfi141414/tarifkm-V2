@@ -1,0 +1,816 @@
+name: Build APK Tarif KM
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Terima lisensi Android SDK
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses || true
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.7
+
+      - name: Tulis proyek Android
+        run: |
+          mkdir -p app/src/main/java/com/tarifkm
+          mkdir -p app/src/main/res/drawable
+          mkdir -p app/src/main/res/mipmap-anydpi-v26
+
+          cat > settings.gradle.kts << 'EOF'
+          pluginManagement {
+              repositories { google(); mavenCentral(); gradlePluginPortal() }
+          }
+          dependencyResolutionManagement {
+              repositories { google(); mavenCentral() }
+          }
+          rootProject.name = "TarifKm"
+          include(":app")
+          EOF
+
+          cat > build.gradle.kts << 'EOF'
+          plugins {
+              id("com.android.application") version "8.5.2" apply false
+              id("org.jetbrains.kotlin.android") version "1.9.24" apply false
+          }
+          EOF
+
+          cat > gradle.properties << 'EOF'
+          org.gradle.jvmargs=-Xmx2g
+          android.useAndroidX=true
+          EOF
+
+          cat > app/build.gradle.kts << 'EOF'
+          plugins {
+              id("com.android.application")
+              id("org.jetbrains.kotlin.android")
+          }
+          android {
+              namespace = "com.tarifkm"
+              compileSdk = 34
+              defaultConfig {
+                  applicationId = "com.tarifkm"
+                  minSdk = 26
+                  targetSdk = 34
+                  versionCode = 4
+                  versionName = "1.3"
+              }
+              compileOptions {
+                  sourceCompatibility = JavaVersion.VERSION_17
+                  targetCompatibility = JavaVersion.VERSION_17
+              }
+              kotlinOptions { jvmTarget = "17" }
+          }
+          EOF
+
+          cat > app/src/main/AndroidManifest.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+              <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+              <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+              <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+              <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+          <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+              <uses-permission android:name="android.permission.WAKE_LOCK" />
+              <application
+                  android:label="Tarif KM"
+                  android:icon="@mipmap/ic_launcher"
+                  android:roundIcon="@mipmap/ic_launcher"
+                  android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true"
+                      android:launchMode="singleTop">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+                  <service
+                      android:name=".TripService"
+                      android:exported="false"
+                      android:foregroundServiceType="location" />
+              </application>
+          </manifest>
+          EOF
+
+          cat > app/src/main/res/drawable/ic_stat.xml << 'EOF'
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="24dp"
+              android:height="24dp"
+              android:viewportWidth="24"
+              android:viewportHeight="24">
+              <path
+                  android:fillColor="#FFFFFFFF"
+                  android:pathData="M12,2C8.13,2 5,5.13 5,9c0,5.25 7,13 7,13s7,-7.75 7,-13c0,-3.87 -3.13,-7 -7,-7zM12,11.5c-1.38,0 -2.5,-1.12 -2.5,-2.5s1.12,-2.5 2.5,-2.5 2.5,1.12 2.5,2.5 -1.12,2.5 -2.5,2.5z" />
+          </vector>
+          EOF
+
+          cat > app/src/main/res/drawable/ic_fg.xml << 'EOF'
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="108dp"
+              android:height="108dp"
+              android:viewportWidth="108"
+              android:viewportHeight="108">
+              <group
+                  android:scaleX="1.9"
+                  android:scaleY="1.9"
+                  android:translateX="31.2"
+                  android:translateY="31.2">
+                  <path
+                      android:fillColor="#FF22C55E"
+                      android:pathData="M12,2C8.13,2 5,5.13 5,9c0,5.25 7,13 7,13s7,-7.75 7,-13c0,-3.87 -3.13,-7 -7,-7zM12,11.5c-1.38,0 -2.5,-1.12 -2.5,-2.5s1.12,-2.5 2.5,-2.5 2.5,1.12 2.5,2.5 -1.12,2.5 -2.5,2.5z" />
+              </group>
+          </vector>
+          EOF
+
+          cat > app/src/main/res/drawable/ic_bg.xml << 'EOF'
+          <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+              <gradient
+                  android:angle="45"
+                  android:startColor="#FF1D4ED8"
+                  android:endColor="#FF7C3AED" />
+          </shape>
+          EOF
+
+          cat > app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+              <background android:drawable="@drawable/ic_bg" />
+              <foreground android:drawable="@drawable/ic_fg" />
+          </adaptive-icon>
+          EOF
+
+          cat > app/src/main/java/com/tarifkm/TripService.kt << 'EOF'
+          package com.tarifkm
+
+          import android.app.Notification
+          import android.app.NotificationChannel
+          import android.app.NotificationManager
+          import android.app.PendingIntent
+          import android.app.Service
+          import android.content.Context
+          import android.content.Intent
+          import android.content.pm.ServiceInfo
+          import android.location.Location
+          import android.location.LocationListener
+          import android.location.LocationManager
+          import android.os.Build
+          import android.os.Bundle
+          import android.os.IBinder
+          import android.os.PowerManager
+          import android.graphics.PixelFormat
+          import android.graphics.Typeface
+          import android.graphics.drawable.GradientDrawable
+          import android.provider.Settings
+          import android.view.Gravity
+          import android.view.MotionEvent
+          import android.view.WindowManager
+          import android.widget.LinearLayout
+          import android.widget.TextView
+          import java.text.NumberFormat
+          import java.util.Locale
+
+          object TripState {
+              @Volatile var jarakM = 0.0
+              @Volatile var harga = 3000.0
+              @Volatile var speed = 0.0
+              @Volatile var acc = -1f
+              @Volatile var running = false
+              @Volatile var startMs = 0L
+          }
+
+          fun rupiah(x: Double): String =
+              "Rp" + NumberFormat.getIntegerInstance(Locale("id", "ID")).format(Math.round(x))
+
+          fun bulat500(x: Double): Double = Math.round(x / 500.0) * 500.0
+
+          class TripService : Service(), LocationListener {
+              private var last: Location? = null
+              private var lastNotif = 0L
+              private var wake: PowerManager.WakeLock? = null
+              private var bubble: LinearLayout? = null
+              private var bKm: TextView? = null
+              private var bRp: TextView? = null
+              private var wm: WindowManager? = null
+
+              override fun onBind(intent: Intent?): IBinder? = null
+
+              private fun updateBubble() {
+                  val km = TripState.jarakM / 1000
+                  bKm?.text = String.format(Locale.US, "%.2f km", km)
+                  bRp?.text = rupiah(km * TripState.harga)
+              }
+
+              private fun showBubble() {
+                  if (bubble != null) return
+                  if (!Settings.canDrawOverlays(this)) return
+                  val d = resources.displayMetrics.density
+                  val w = getSystemService(Context.WINDOW_SERVICE) as WindowManager
+                  wm = w
+                  val box = LinearLayout(this)
+                  box.orientation = LinearLayout.VERTICAL
+                  box.gravity = Gravity.CENTER
+                  val bg = GradientDrawable(
+                      GradientDrawable.Orientation.TL_BR,
+                      intArrayOf(0xFF1D4ED8.toInt(), 0xFF7C3AED.toInt())
+                  )
+                  bg.cornerRadius = 20 * d
+                  box.background = bg
+                  box.setPadding((14 * d).toInt(), (8 * d).toInt(), (14 * d).toInt(), (8 * d).toInt())
+                  val h = TextView(this)
+                  h.text = "● Tarif KM"
+                  h.textSize = 10f
+                  h.setTextColor(0xFF86EFAC.toInt())
+                  val k = TextView(this)
+                  k.textSize = 16f
+                  k.typeface = Typeface.DEFAULT_BOLD
+                  k.setTextColor(0xFFFFFFFF.toInt())
+                  val r = TextView(this)
+                  r.textSize = 13f
+                  r.typeface = Typeface.DEFAULT_BOLD
+                  r.setTextColor(0xFFFDE68A.toInt())
+                  box.addView(h)
+                  box.addView(k)
+                  box.addView(r)
+                  bKm = k
+                  bRp = r
+                  val lp = WindowManager.LayoutParams(
+                      WindowManager.LayoutParams.WRAP_CONTENT,
+                      WindowManager.LayoutParams.WRAP_CONTENT,
+                      WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+                      WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+                      PixelFormat.TRANSLUCENT
+                  )
+                  lp.gravity = Gravity.TOP or Gravity.START
+                  lp.x = (16 * d).toInt()
+                  lp.y = (90 * d).toInt()
+                  var sx = 0f
+                  var sy = 0f
+                  var ox = 0
+                  var oy = 0
+                  var moved = false
+                  box.setOnTouchListener { _, e ->
+                      when (e.action) {
+                          MotionEvent.ACTION_DOWN -> {
+                              sx = e.rawX; sy = e.rawY; ox = lp.x; oy = lp.y; moved = false
+                          }
+                          MotionEvent.ACTION_MOVE -> {
+                              val dx = e.rawX - sx
+                              val dy = e.rawY - sy
+                              if (Math.abs(dx) > 10 || Math.abs(dy) > 10) moved = true
+                              lp.x = ox + dx.toInt()
+                              lp.y = oy + dy.toInt()
+                              try { w.updateViewLayout(box, lp) } catch (ex: Exception) {}
+                          }
+                          MotionEvent.ACTION_UP -> {
+                              if (!moved) {
+                                  val i = Intent(this, MainActivity::class.java)
+                                  i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                                  startActivity(i)
+                              }
+                          }
+                      }
+                      true
+                  }
+                  try {
+                      w.addView(box, lp)
+                      bubble = box
+                      updateBubble()
+                  } catch (ex: Exception) {
+                      bubble = null
+                  }
+              }
+
+              private fun hideBubble() {
+                  val b = bubble ?: return
+                  try { wm?.removeView(b) } catch (ex: Exception) {}
+                  bubble = null
+                  bKm = null
+                  bRp = null
+              }
+
+              private fun buildNotif(text: String): Notification {
+                  val pi = PendingIntent.getActivity(
+                      this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE
+                  )
+                  val b = Notification.Builder(this, "trip2")
+                      .setContentTitle("Tarif KM sedang berjalan")
+                      .setContentText(text)
+                      .setSmallIcon(R.drawable.ic_stat)
+                      .setColor(0xFF22C55E.toInt())
+                      .setContentIntent(pi)
+                      .setOngoing(true)
+                      .setOnlyAlertOnce(true)
+                      .setShowWhen(true)
+                      .setWhen(TripState.startMs)
+                      .setUsesChronometer(true)
+                      .setTicker("Tarif KM aktif")
+                      .setVisibility(Notification.VISIBILITY_PUBLIC)
+                      .setCategory(Notification.CATEGORY_SERVICE)
+                  if (Build.VERSION.SDK_INT >= 31) {
+                      b.setForegroundServiceBehavior(Notification.FOREGROUND_SERVICE_IMMEDIATE)
+                  }
+                  return b.build()
+              }
+
+              override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+                  val act = intent?.action
+                  if (act == "SHOW") {
+                      if (TripState.running) showBubble()
+                      return START_NOT_STICKY
+                  }
+                  if (act == "HIDE") {
+                      hideBubble()
+                      return START_NOT_STICKY
+                  }
+                  if (!TripState.running) TripState.startMs = System.currentTimeMillis()
+                  val nm = getSystemService(NotificationManager::class.java)
+                  nm.deleteNotificationChannel("trip")
+                  val ch = NotificationChannel("trip2", "Trip berjalan", NotificationManager.IMPORTANCE_DEFAULT)
+                  ch.setSound(null, null)
+                  ch.enableVibration(false)
+                  ch.setShowBadge(false)
+                  ch.lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+                  nm.createNotificationChannel(ch)
+                  val n = buildNotif("Menunggu GPS...")
+                  if (Build.VERSION.SDK_INT >= 29) {
+                      startForeground(1, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION)
+                  } else {
+                      startForeground(1, n)
+                  }
+                  if (wake == null) {
+                      wake = (getSystemService(Context.POWER_SERVICE) as PowerManager)
+                          .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "tarifkm:trip")
+                      wake?.acquire()
+                  }
+                  try {
+                      val lm = getSystemService(Context.LOCATION_SERVICE) as LocationManager
+                      lm.removeUpdates(this)
+                      lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000L, 0f, this)
+                      TripState.running = true
+                  } catch (e: SecurityException) {
+                      stopSelf()
+                  }
+                  return START_NOT_STICKY
+              }
+
+              override fun onLocationChanged(loc: Location) {
+                  TripState.acc = loc.accuracy
+                  if (loc.accuracy > 25f) return
+                  val prev = last
+                  if (prev != null) {
+                      val dt = maxOf((loc.time - prev.time) / 1000.0, 0.2)
+                      val d = prev.distanceTo(loc).toDouble()
+                      val v = if (loc.hasSpeed()) loc.speed.toDouble() else d / dt
+                      TripState.speed = v
+                      if (v >= 1.0 && d / dt <= 55.0) TripState.jarakM += d
+                  }
+                  last = loc
+                  updateBubble()
+                  val now = System.currentTimeMillis()
+                  if (now - lastNotif > 3000) {
+                      lastNotif = now
+                      val km = TripState.jarakM / 1000
+                      val tot = km * TripState.harga
+                      val teks = String.format(Locale.US, "%.2f km | ", km) + rupiah(tot)
+                      getSystemService(NotificationManager::class.java).notify(1, buildNotif(teks))
+                  }
+              }
+
+              override fun onProviderEnabled(provider: String) {}
+              override fun onProviderDisabled(provider: String) {}
+              override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) {}
+
+              override fun onDestroy() {
+                  hideBubble()
+                  try {
+                      (getSystemService(Context.LOCATION_SERVICE) as LocationManager).removeUpdates(this)
+                  } catch (e: Exception) {
+                  }
+                  try {
+                      wake?.release()
+                  } catch (e: Exception) {
+                  }
+                  wake = null
+                  TripState.running = false
+                  super.onDestroy()
+              }
+          }
+          EOF
+
+          cat > app/src/main/java/com/tarifkm/MainActivity.kt << 'EOF'
+          package com.tarifkm
+
+          import android.Manifest
+          import android.app.Activity
+          import android.content.Context
+          import android.content.Intent
+          import android.content.pm.PackageManager
+          import android.graphics.Color
+          import android.graphics.Typeface
+          import android.graphics.drawable.Drawable
+          import android.graphics.drawable.GradientDrawable
+          import android.os.Build
+          import android.net.Uri
+          import android.os.Bundle
+          import android.provider.Settings
+          import android.os.Handler
+          import android.os.Looper
+          import android.text.Editable
+          import android.text.InputType
+          import android.text.TextWatcher
+          import android.view.Gravity
+          import android.widget.Button
+          import android.widget.EditText
+          import android.widget.LinearLayout
+          import android.widget.ScrollView
+          import android.widget.TextView
+          import java.text.SimpleDateFormat
+          import java.util.Date
+          import java.util.Locale
+
+          class MainActivity : Activity() {
+              private val BG = 0xFF0B1220.toInt()
+              private val CARD = 0xFF141C2F.toInt()
+              private val FIELD = 0xFF1E293B.toInt()
+              private val TEXT = 0xFFF1F5F9.toInt()
+              private val MUTED = 0xFF94A3B8.toInt()
+              private val GREEN = 0xFF22C55E.toInt()
+              private val DKGREEN = 0xFF166534.toInt()
+              private val RED = 0xFFEF4444.toInt()
+              private val BLUE = 0xFF3B82F6.toInt()
+              private val MATCH = LinearLayout.LayoutParams.MATCH_PARENT
+              private val WRAP = LinearLayout.LayoutParams.WRAP_CONTENT
+              private val ID = Locale("id", "ID")
+              private val fJam = SimpleDateFormat("HH:mm:ss", ID)
+              private val fTgl = SimpleDateFormat("EEEE, d MMMM yyyy", ID)
+
+              private lateinit var tvJam: TextView
+              private lateinit var tvTgl: TextView
+              private lateinit var tvKm: TextView
+              private lateinit var tvTot: TextView
+              private lateinit var tvBulat: TextView
+              private lateinit var tvSpeed: TextView
+              private lateinit var tvAcc: TextView
+              private lateinit var tvDur: TextView
+              private lateinit var tvChip: TextView
+              private lateinit var tvHist: TextView
+              private lateinit var etHarga: EditText
+              private lateinit var btnGo: Button
+              private var lastRunning: Boolean? = null
+              private val handler = Handler(Looper.getMainLooper())
+              private val tick = object : Runnable {
+                  override fun run() {
+                      refresh()
+                      handler.postDelayed(this, 1000)
+                  }
+              }
+
+              private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
+
+              private fun box(color: Int, r: Int): GradientDrawable {
+                  val g = GradientDrawable()
+                  g.setColor(color)
+                  g.cornerRadius = dp(r).toFloat()
+                  return g
+              }
+
+              private fun tv(text: String, size: Float, color: Int, bold: Boolean = false): TextView {
+                  val t = TextView(this)
+                  t.text = text
+                  t.textSize = size
+                  t.setTextColor(color)
+                  if (bold) t.typeface = Typeface.DEFAULT_BOLD
+                  return t
+              }
+
+              private fun card(bg: Drawable): LinearLayout {
+                  val c = LinearLayout(this)
+                  c.orientation = LinearLayout.VERTICAL
+                  c.background = bg
+                  c.setPadding(dp(18), dp(16), dp(18), dp(16))
+                  val lp = LinearLayout.LayoutParams(MATCH, WRAP)
+                  lp.bottomMargin = dp(12)
+                  c.layoutParams = lp
+                  return c
+              }
+
+              private fun stat(label: String, v: TextView, last: Boolean = false): LinearLayout {
+                  val c = LinearLayout(this)
+                  c.orientation = LinearLayout.VERTICAL
+                  c.background = box(CARD, 18)
+                  c.setPadding(dp(14), dp(12), dp(14), dp(12))
+                  c.addView(tv(label, 11f, MUTED))
+                  c.addView(v)
+                  val lp = LinearLayout.LayoutParams(0, WRAP, 1f)
+                  if (!last) lp.rightMargin = dp(8)
+                  c.layoutParams = lp
+                  return c
+              }
+
+              private fun btn(text: String, color: Int): Button {
+                  val b = Button(this)
+                  b.text = text
+                  b.isAllCaps = false
+                  b.textSize = 16f
+                  b.typeface = Typeface.DEFAULT_BOLD
+                  b.setTextColor(Color.WHITE)
+                  b.background = box(color, 16)
+                  b.stateListAnimator = null
+                  val lp = LinearLayout.LayoutParams(0, dp(54), 1f)
+                  lp.leftMargin = dp(4)
+                  lp.rightMargin = dp(4)
+                  b.layoutParams = lp
+                  return b
+              }
+
+              override fun onCreate(saved: Bundle?) {
+                  super.onCreate(saved)
+                  window.statusBarColor = BG
+                  window.navigationBarColor = BG
+                  val sp = getSharedPreferences("tarif", Context.MODE_PRIVATE)
+                  TripState.harga = sp.getFloat("harga", 3000f).toDouble()
+
+                  val root = ScrollView(this)
+                  root.setBackgroundColor(BG)
+                  root.isFillViewport = true
+                  val col = LinearLayout(this)
+                  col.orientation = LinearLayout.VERTICAL
+                  col.setPadding(dp(16), dp(44), dp(16), dp(24))
+                  root.addView(col)
+
+                  // Header: jam, tanggal, status
+                  val head = LinearLayout(this)
+                  head.orientation = LinearLayout.HORIZONTAL
+                  head.gravity = Gravity.CENTER_VERTICAL
+                  val hlp = LinearLayout.LayoutParams(MATCH, WRAP)
+                  hlp.bottomMargin = dp(16)
+                  head.layoutParams = hlp
+                  val hleft = LinearLayout(this)
+                  hleft.orientation = LinearLayout.VERTICAL
+                  tvJam = tv("00:00:00", 34f, TEXT, true)
+                  tvTgl = tv("", 14f, MUTED)
+                  hleft.addView(tvJam)
+                  hleft.addView(tvTgl)
+                  head.addView(hleft, LinearLayout.LayoutParams(0, WRAP, 1f))
+                  tvChip = tv("Berhenti", 13f, MUTED, true)
+                  tvChip.setPadding(dp(14), dp(6), dp(14), dp(6))
+                  head.addView(tvChip)
+                  col.addView(head)
+
+                  // Hero
+                  val grad = GradientDrawable(
+                      GradientDrawable.Orientation.TL_BR,
+                      intArrayOf(0xFF1D4ED8.toInt(), 0xFF7C3AED.toInt())
+                  )
+                  grad.cornerRadius = dp(24).toFloat()
+                  val hero = card(grad)
+                  hero.setPadding(dp(20), dp(20), dp(20), dp(20))
+                  hero.addView(tv("Jarak tempuh", 14f, 0xCCFFFFFF.toInt()))
+                  tvKm = tv("0,00 km", 46f, Color.WHITE, true)
+                  hero.addView(tvKm)
+                  val lblTot = tv("Total tarif", 14f, 0xCCFFFFFF.toInt())
+                  lblTot.setPadding(0, dp(12), 0, 0)
+                  hero.addView(lblTot)
+                  tvTot = tv("Rp0", 38f, 0xFF86EFAC.toInt(), true)
+                  hero.addView(tvTot)
+                  tvBulat = tv("Dibulatkan: Rp0", 14f, 0xFFFDE68A.toInt())
+                  hero.addView(tvBulat)
+                  col.addView(hero)
+
+                  // Statistik
+                  tvSpeed = tv("0 km/j", 16f, 0xFF38BDF8.toInt(), true)
+                  tvAcc = tv("-", 16f, 0xFFFBBF24.toInt(), true)
+                  tvDur = tv("00:00:00", 16f, 0xFFC4B5FD.toInt(), true)
+                  val stats = LinearLayout(this)
+                  stats.orientation = LinearLayout.HORIZONTAL
+                  val slp = LinearLayout.LayoutParams(MATCH, WRAP)
+                  slp.bottomMargin = dp(12)
+                  stats.layoutParams = slp
+                  stats.addView(stat("Kecepatan", tvSpeed))
+                  stats.addView(stat("Akurasi GPS", tvAcc))
+                  stats.addView(stat("Durasi", tvDur, true))
+                  col.addView(stats)
+
+                  // Harga per km
+                  val hc = card(box(CARD, 20))
+                  hc.addView(tv("Harga per km (Rp), bisa diubah kapan saja", 12f, MUTED))
+                  etHarga = EditText(this)
+                  etHarga.inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL
+                  etHarga.textSize = 24f
+                  etHarga.typeface = Typeface.DEFAULT_BOLD
+                  etHarga.setTextColor(TEXT)
+                  etHarga.background = box(FIELD, 14)
+                  etHarga.setPadding(dp(14), dp(10), dp(14), dp(10))
+                  etHarga.setText(TripState.harga.toLong().toString())
+                  etHarga.addTextChangedListener(object : TextWatcher {
+                      override fun afterTextChanged(s: Editable?) {
+                          val v = s.toString().toDoubleOrNull() ?: return
+                          if (v > 0) {
+                              TripState.harga = v
+                              sp.edit().putFloat("harga", v.toFloat()).apply()
+                          }
+                      }
+                      override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+                      override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+                  })
+                  val elp = LinearLayout.LayoutParams(MATCH, WRAP)
+                  elp.topMargin = dp(8)
+                  hc.addView(etHarga, elp)
+
+                  val chips = LinearLayout(this)
+                  chips.orientation = LinearLayout.HORIZONTAL
+                  val clp = LinearLayout.LayoutParams(MATCH, WRAP)
+                  clp.topMargin = dp(10)
+                  chips.layoutParams = clp
+                  for (p in listOf(2000, 3000, 4000, 5000)) {
+                      val c = tv(rupiah(p.toDouble()), 13f, TEXT, true)
+                      c.gravity = Gravity.CENTER
+                      c.background = box(FIELD, 12)
+                      c.setPadding(dp(8), dp(8), dp(8), dp(8))
+                      c.setOnClickListener { etHarga.setText(p.toString()) }
+                      val l = LinearLayout.LayoutParams(0, WRAP, 1f)
+                      l.rightMargin = dp(6)
+                      chips.addView(c, l)
+                  }
+                  hc.addView(chips)
+                  col.addView(hc)
+
+                  // Tombol
+                  btnGo = btn("Mulai", GREEN)
+                  btnGo.setOnClickListener { mulai() }
+                  val btnStop = btn("Selesai", RED)
+                  btnStop.setOnClickListener { selesai() }
+                  val btnReset = btn("Reset", BLUE)
+                  btnReset.setOnClickListener {
+                      TripState.jarakM = 0.0
+                      TripState.speed = 0.0
+                      if (TripState.running) TripState.startMs = System.currentTimeMillis()
+                      refresh()
+                  }
+                  val row = LinearLayout(this)
+                  row.orientation = LinearLayout.HORIZONTAL
+                  val rlp = LinearLayout.LayoutParams(MATCH, WRAP)
+                  rlp.bottomMargin = dp(12)
+                  row.layoutParams = rlp
+                  row.addView(btnGo)
+                  row.addView(btnStop)
+                  row.addView(btnReset)
+                  col.addView(row)
+
+                  // Riwayat
+                  val hist = card(box(CARD, 20))
+                  hist.addView(tv("Riwayat trip", 12f, MUTED))
+                  tvHist = tv("", 14f, TEXT)
+                  tvHist.setPadding(0, dp(6), 0, 0)
+                  hist.addView(tvHist)
+                  col.addView(hist)
+
+                  setContentView(root)
+                  showHist()
+                  refresh()
+              }
+
+              private fun mulai() {
+                  if (TripState.running) return
+                  val need = mutableListOf<String>()
+                  if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                      need.add(Manifest.permission.ACCESS_FINE_LOCATION)
+                      need.add(Manifest.permission.ACCESS_COARSE_LOCATION)
+                  }
+                  if (Build.VERSION.SDK_INT >= 33 &&
+                      checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+                  ) {
+                      need.add(Manifest.permission.POST_NOTIFICATIONS)
+                  }
+                  if (need.isNotEmpty()) {
+                      requestPermissions(need.toTypedArray(), 1)
+                      return
+                  }
+                  startForegroundService(Intent(this, TripService::class.java))
+                  askOverlay()
+              }
+
+              private fun askOverlay() {
+                  val sp = getSharedPreferences("tarif", Context.MODE_PRIVATE)
+                  if (!Settings.canDrawOverlays(this) && !sp.getBoolean("askedOverlay", false)) {
+                      sp.edit().putBoolean("askedOverlay", true).apply()
+                      startActivity(
+                          Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + packageName))
+                      )
+                  }
+              }
+
+              private fun bubbleCmd(a: String) {
+                  if (!TripState.running) return
+                  val i = Intent(this, TripService::class.java)
+                  i.action = a
+                  startService(i)
+              }
+
+              override fun onRequestPermissionsResult(code: Int, p: Array<out String>, r: IntArray) {
+                  super.onRequestPermissionsResult(code, p, r)
+                  if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+                      startForegroundService(Intent(this, TripService::class.java))
+                      askOverlay()
+                  }
+              }
+
+              private fun durasi(): String {
+                  if (!TripState.running) return "00:00:00"
+                  val s = maxOf((System.currentTimeMillis() - TripState.startMs) / 1000, 0L)
+                  return String.format(Locale.US, "%02d:%02d:%02d", s / 3600, (s % 3600) / 60, s % 60)
+              }
+
+              private fun selesai() {
+                  if (TripState.running && TripState.jarakM > 0) {
+                      val km = TripState.jarakM / 1000
+                      val sp = getSharedPreferences("tarif", Context.MODE_PRIVATE)
+                      val tgl = SimpleDateFormat("dd/MM HH:mm", Locale.getDefault()).format(Date())
+                      val line = tgl + " | " + String.format(ID, "%.2f km", km) +
+                          " x " + rupiah(TripState.harga) + " = " + rupiah(bulat500(km * TripState.harga)) +
+                          " | " + durasi()
+                      val old = sp.getString("hist", "") ?: ""
+                      val all = (listOf(line) + old.split("\n").filter { it.isNotBlank() }).take(15)
+                      sp.edit().putString("hist", all.joinToString("\n")).apply()
+                  }
+                  stopService(Intent(this, TripService::class.java))
+                  showHist()
+              }
+
+              private fun showHist() {
+                  val sp = getSharedPreferences("tarif", Context.MODE_PRIVATE)
+                  val h = sp.getString("hist", "") ?: ""
+                  tvHist.text = if (h.isBlank()) "Belum ada." else h
+              }
+
+              private fun refresh() {
+                  val now = Date()
+                  tvJam.text = fJam.format(now)
+                  tvTgl.text = fTgl.format(now)
+                  val run = TripState.running
+                  val km = TripState.jarakM / 1000
+                  val tot = km * TripState.harga
+                  tvKm.text = String.format(ID, "%.2f km", km)
+                  tvTot.text = rupiah(tot)
+                  tvBulat.text = "Dibulatkan: " + rupiah(bulat500(tot))
+                  val spd = if (run) TripState.speed else 0.0
+                  tvSpeed.text = Math.round(spd * 3.6).toString() + " km/j"
+                  tvAcc.text = if (TripState.acc < 0) "-" else Math.round(TripState.acc).toString() + " m"
+                  tvDur.text = durasi()
+                  if (run) {
+                      tvChip.alpha = if ((System.currentTimeMillis() / 1000) % 2 == 0L) 1f else 0.55f
+                  } else {
+                      tvChip.alpha = 1f
+                  }
+                  if (lastRunning != run) {
+                      lastRunning = run
+                      tvChip.text = if (run) "● GPS aktif" else "Berhenti"
+                      tvChip.setTextColor(if (run) GREEN else MUTED)
+                      tvChip.background = box(if (run) 0x3322C55E else 0x33FFFFFF, 20)
+                      btnGo.text = if (run) "Berjalan" else "Mulai"
+                      btnGo.background = box(if (run) DKGREEN else GREEN, 16)
+                  }
+              }
+
+              override fun onResume() {
+                  super.onResume()
+                  bubbleCmd("HIDE")
+                  handler.post(tick)
+              }
+
+              override fun onPause() {
+                  super.onPause()
+                  bubbleCmd("SHOW")
+                  handler.removeCallbacks(tick)
+              }
+          }
+          EOF
+
+      - name: Bangun APK
+        run: gradle assembleDebug --no-daemon
+
+      - name: Terbitkan APK di Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: Tarif KM build ${{ github.run_number }}
+          files: app/build/outputs/apk/debug/app-debug.apk
